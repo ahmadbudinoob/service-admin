@@ -1,0 +1,12 @@
+# Configuration for the main application
+listen_on_host: "localhost"
+listen_on_port: "8080"
+
+# Configuration for Oracle database connection
+oracle_host: 192.168.8.70
+oracle_port: 1521
+oracle_user: lots
+oracle_pass: lots
+oracle_service_name: ORCLLIM
+
+crypto_key: G89$@J3~.#}*&^a$9

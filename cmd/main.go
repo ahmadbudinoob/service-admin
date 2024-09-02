@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-	// Initialize the application configuration
 	config.Init()
 
 	database, err := db.InitializeDB()
@@ -18,13 +17,11 @@ func main() {
 	}
 	defer database.Close()
 
-	// Initialize the router
 	e, err := router.InitRouter(database)
 	if err != nil {
 		log.Fatalf("Failed to initialize router: %v", err)
 	}
 
-	// Start the server
 	log.Println("Server is running on port 8080")
 	log.Fatal(e.Start(":8080"))
 }

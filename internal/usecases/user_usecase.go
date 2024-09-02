@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"saranasistemsolusindo.com/gusen-admin/internal/constants"
 	"saranasistemsolusindo.com/gusen-admin/internal/models"
@@ -18,6 +17,7 @@ type UserUseCase struct {
 	userRepo      repositories.UserRepository
 	userLoginRepo repositories.UserLogRepository
 	clientRepo    repositories.ClientRepository
+	cityRepo      repositories.CityRepository
 }
 
 // NewUserUseCase creates a new UserUseCase
@@ -25,7 +25,8 @@ func NewUserUseCase(db *sql.DB) (*UserUseCase, error) {
 	userRepo := repositories.NewUserRepository(db)
 	userLoginRepo := repositories.NewUserLogRepository(db)
 	clientRepo := repositories.NewClientRepository(db)
-	return &UserUseCase{userRepo: userRepo, userLoginRepo: userLoginRepo, clientRepo: clientRepo}, nil
+	cityRepo := repositories.NewCityRepository(db)
+	return &UserUseCase{userRepo: userRepo, userLoginRepo: userLoginRepo, clientRepo: clientRepo, cityRepo: cityRepo}, nil
 }
 
 // LoginAdmin handles the login for admin users
@@ -88,7 +89,6 @@ func (u *UserUseCase) GetUserByLoginId(ctx context.Context, loginID string) (*mo
 		CreateDT:          user.CreateDT,
 		UpdateBy:          user.UpdateBy,
 		UpdateDT:          user.UpdateDT,
-		PhotoID:           &user.PhotoID.Int16,
 		IsProtlAm:         &user.IsProtlAm.String,
 		Email:             &user.Email.String,
 		ClientBirthDT:     &user.ClientBirthDT.Time,
@@ -137,7 +137,6 @@ func comparePassword(hashedPassword, plainPassword string) error {
 }
 
 func (u *UserUseCase) GetClientListByLoginID(ctx context.Context, loginID string) ([]*models.UserClient, error) {
-	fmt.Println("usecase")
 	return u.clientRepo.GetListClientByLoginID(loginID)
 }
 
@@ -166,4 +165,8 @@ func (u *UserUseCase) ResetPin(ctx context.Context, login string, pin string) er
 	hashedPin := hasher.Sum(nil)
 	hashedPinHex := hex.EncodeToString(hashedPin)
 	return u.userRepo.ChangePin(ctx, login, hashedPinHex)
+}
+
+func (u *UserUseCase) GetCities(ctx context.Context) ([]*models.City, error) {
+	return u.cityRepo.GetAllCities(ctx)
 }

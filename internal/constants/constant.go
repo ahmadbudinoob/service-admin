@@ -8,3 +8,5 @@ const (
 const (
 	IS_ADMIN = "c"
 )
+
+const ()

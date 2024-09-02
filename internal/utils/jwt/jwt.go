@@ -3,6 +3,8 @@ package jwt
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"saranasistemsolusindo.com/gusen-admin/internal/constants"
+	"saranasistemsolusindo.com/gusen-admin/internal/handlers/responses"
 )
 
 type Claims struct {
@@ -52,7 +55,11 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		// Split the header to get the token part
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
-			http.Error(w, "Invalid token format", http.StatusUnauthorized)
+			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(responses.BaseResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "UNAUTHORIZED",
+			})
 			return
 		}
 
@@ -62,29 +69,42 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return secretKey, nil
 		})
 
+		fmt.Println("Claims:", claims)
+		fmt.Println("Token:", token)
+
 		if err != nil {
 			if err == jwt.ErrSignatureInvalid {
-				http.Error(w, "Invalid token signature", http.StatusUnauthorized)
+				http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(responses.BaseResponse{
+					StatusCode: http.StatusUnauthorized,
+					Message:    "UNAUTHORIZED",
+				})
 				return
 			}
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(responses.BaseResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "UNAUTHORIZED",
+			})
 			return
 		}
 
 		if !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		// Check if the token is expired
-		if claims.ExpiresAt < time.Now().Unix() {
-			http.Error(w, "Token expired", http.StatusUnauthorized)
+			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(responses.BaseResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "UNAUTHORIZED",
+			})
 			return
 		}
 
 		// Check if OrderRestrictions is "q"
 		if claims.OrderRestrictions != constants.IS_ADMIN {
-			http.Error(w, "Access denied", http.StatusForbidden)
+			http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(responses.BaseResponse{
+				StatusCode: http.StatusUnauthorized,
+				Message:    "UNAUTHORIZED",
+			})
 			return
 		}
 

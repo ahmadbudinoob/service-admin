@@ -31,8 +31,8 @@ func InitRouter(db *sql.DB) (*echo.Echo, error) {
 	// Group routes that require JWT authentication
 	authGroup := e.Group("", echo.WrapMiddleware(jwt.JWTMiddleware))
 	authGroup.GET("/paginated", userHandler.GetUserPaginated)
-	authGroup.POST("/create", userHandler.CreateUser)
-	authGroup.PUT("/update/:id", userHandler.UpdateUser)
+	// authGroup.POST("/create", userHandler.CreateUser)
+	// authGroup.PUT("/update/:id", userHandler.UpdateUser)
 	authGroup.GET("/user/:login_id", userHandler.GetUserByLoginId)
 	authGroup.GET("/log_history", userHandler.GetLogHistory)
 	authGroup.GET("/client/login/:login_id", userHandler.GetClientByLoginID)
@@ -40,6 +40,7 @@ func InitRouter(db *sql.DB) (*echo.Echo, error) {
 	authGroup.PUT("/client/update", userHandler.UpdateClientByUserLogin)
 	authGroup.GET("/client/not_in_user", userHandler.GetAvailableClients)
 	authGroup.PUT("/deactive-user/:login_id", userHandler.DeactiveUser)
+	authGroup.GET("/user/cities", userHandler.GetCities)
 	// reset pin and password
 	authGroup.PUT("/reset-pin", userHandler.ResetPin)
 	authGroup.PUT("/reset-password", userHandler.ResetPassword)

@@ -5,28 +5,19 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"saranasistemsolusindo.com/gusen-admin/internal/handlers/requests"
-	"saranasistemsolusindo.com/gusen-admin/internal/models"
+	"saranasistemsolusindo.com/gusen-admin/internal/handlers/responses"
 	"saranasistemsolusindo.com/gusen-admin/internal/usecases"
 )
 
 // UserHandler struct
 type UserHandler struct {
 	userUseCase usecases.UserUseCase
-}
-
-type BaseResponse struct {
-	StatusCode int         `json:"status_code"`
-	Message    string      `json:"message"`
-	Data       interface{} `json:"data,omitempty"`
 }
 
 // NewUserHandler creates a new UserHandler
@@ -36,11 +27,6 @@ func NewUserHandler(db *sql.DB) (*UserHandler, error) {
 		return nil, err
 	}
 	return &UserHandler{userUseCase: *userUseCase}, nil
-}
-
-type LoginRequest struct {
-	LoginID  string `json:"loginID"`
-	Password string `json:"password"`
 }
 
 type UserResponse struct {
@@ -53,9 +39,9 @@ type UserResponse struct {
 }
 
 func (h *UserHandler) LoginAdmin(c echo.Context) error {
-	var loginReq LoginRequest
+	var loginReq requests.LoginRequest
 	if err := c.Bind(&loginReq); err != nil {
-		return c.JSON(http.StatusBadRequest, BaseResponse{
+		return c.JSON(http.StatusBadRequest, responses.BaseResponse{
 			StatusCode: http.StatusBadRequest,
 			Message:    "Invalid request payload",
 		})
@@ -65,13 +51,13 @@ func (h *UserHandler) LoginAdmin(c echo.Context) error {
 
 	token, err := h.userUseCase.LoginAdmin(id, loginReq.Password)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, BaseResponse{
+		return c.JSON(http.StatusUnauthorized, responses.BaseResponse{
 			StatusCode: http.StatusUnauthorized,
 			Message:    err.Error(),
 		})
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Login successful",
 		Data:       map[string]string{"token": token},
@@ -98,7 +84,7 @@ func (h *UserHandler) GetUserPaginated(c echo.Context) error {
 
 	users, err := h.userUseCase.FetchUsers(context.Background(), offset, size, keyword)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, BaseResponse{
+		return c.JSON(http.StatusInternalServerError, responses.BaseResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to fetch users",
 		})
@@ -106,7 +92,7 @@ func (h *UserHandler) GetUserPaginated(c echo.Context) error {
 
 	total, err := h.userUseCase.GetTotalUsers(context.Background())
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, BaseResponse{
+		return c.JSON(http.StatusInternalServerError, responses.BaseResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to fetch total user",
 		})
@@ -119,98 +105,17 @@ func (h *UserHandler) GetUserPaginated(c echo.Context) error {
 		"total": total,
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch User Successful",
 		Data:       response,
 	})
 }
 
-type CreateUserRequest struct {
-	LoginID           string    `json:"loginID"`
-	FullName          string    `json:"fullName"`
-	Password          string    `json:"password"`
-	PasswordExpDate   time.Time `json:"passwordExpDate"`
-	UserStatus        string    `json:"userStatus"`
-	OrderRestrictions string    `json:"orderRestrictions"`
-	PIN               string    `json:"pin"`
-}
-
 func hashString(s string) string {
 	h := sha1.New()
 	h.Write([]byte(s))
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-func (h *UserHandler) CreateUser(c echo.Context) error {
-	var req CreateUserRequest
-
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-	}
-
-	userToken, ok := c.Get("user").(*jwt.Token)
-	if !ok {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid token"})
-	}
-
-	claims, ok := userToken.Claims.(*jwt.MapClaims)
-	if !ok {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid claims"})
-	}
-
-	loginID := (*claims)["LoginID"].(string)
-
-	user, _ := h.userUseCase.GetUserByLoginId(c.Request().Context(), req.LoginID)
-	if user != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Login ID already Registered"})
-	}
-
-	// Map CreateUserRequest to models.User
-	newUser := models.User{
-		LoginID:           req.LoginID,
-		FullName:          req.FullName,
-		Password:          hashString(req.Password),
-		PasswordExpDate:   req.PasswordExpDate, // Assuming parseTime is a function to parse the date string
-		UserStatus:        "N",
-		OrderRestrictions: req.OrderRestrictions,
-		PIN:               hashString(req.PIN),
-		PINExpDate:        req.PasswordExpDate,
-		CreateDT:          time.Now(),
-		CreateBy:          loginID,
-		UpdateDT:          time.Now(),
-		UpdateBy:          loginID,
-	}
-
-	if newUser.LoginID == "" || newUser.FullName == "" || newUser.OrderRestrictions == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing required fields"})
-	}
-
-	err := h.userUseCase.CreateUser(c.Request().Context(), &newUser)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create user"})
-	}
-
-	return c.JSON(http.StatusOK, BaseResponse{
-		StatusCode: http.StatusOK,
-		Message:    "Create User Successful",
-		Data:       newUser,
-	})
-}
-
-func (h *UserHandler) UpdateUser(c echo.Context) error {
-	userID := c.Param("id")
-
-	var user models.User
-	if err := c.Bind(&user); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-	}
-
-	if err := h.userUseCase.UpdateUser(c.Request().Context(), userID, &user); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update user"})
-	}
-
-	return c.JSON(http.StatusOK, map[string]string{"message": "User updated successfully"})
 }
 
 func (h *UserHandler) GetUserByLoginId(c echo.Context) error {
@@ -221,7 +126,7 @@ func (h *UserHandler) GetUserByLoginId(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch user"})
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch User Successful",
 		Data:       user,
@@ -249,7 +154,7 @@ func (h *UserHandler) GetLogHistory(c echo.Context) error {
 
 	userLogin, total, err := h.userUseCase.GetUserLoginPaginated(context.Background(), offset, size, keyword)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, BaseResponse{
+		return c.JSON(http.StatusInternalServerError, responses.BaseResponse{
 			StatusCode: http.StatusInternalServerError,
 			Message:    "Failed to fetch log history",
 		})
@@ -262,7 +167,7 @@ func (h *UserHandler) GetLogHistory(c echo.Context) error {
 		"total": total,
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch User Successful",
 		Data:       response,
@@ -276,7 +181,7 @@ func (u *UserHandler) GetClientByLoginID(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch user"})
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch User Successful",
 		Data:       client,
@@ -289,7 +194,7 @@ func (u *UserHandler) GetAvailableClients(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch clients"})
 	}
 
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch Clients Successful",
 		Data:       clients,
@@ -306,7 +211,7 @@ func (u *UserHandler) GetClientByClientID(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch clients"})
 	}
-	return c.JSON(http.StatusOK, BaseResponse{
+	return c.JSON(http.StatusOK, responses.BaseResponse{
 		StatusCode: http.StatusOK,
 		Message:    "Fetch Clients Successful",
 		Data:       clients,
@@ -330,11 +235,8 @@ func (u *UserHandler) ResetPin(c echo.Context) error {
 	var req requests.ResetPin
 
 	if err := c.Bind(&req); err != nil {
-		fmt.Println(err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 	}
-
-	fmt.Println(req.Pin)
 
 	if len(req.Pin) != 6 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Password must be longer than 6 characters"})
@@ -359,4 +261,16 @@ func (u *UserHandler) ResetPassword(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to reset password"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"message": "Password reset successfully"})
+}
+
+func (u *UserHandler) GetCities(c echo.Context) error {
+	cities, err := u.userUseCase.GetCities(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cities"})
+	}
+	return c.JSON(http.StatusOK, responses.BaseResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Fetch Cities Successful",
+		Data:       cities,
+	})
 }
